@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "306317035421",
+    "project_id": "electricitips",
+    "storage_bucket": "electricitips.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:306317035421:android:1238f50479f3af5a509174",
+        "android_client_info": {
+          "package_name": "com.example.electricitips"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "306317035421-3gpdsd735d4h9sctdnqtf2jdvvkc5rcq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCXT82rrQTpS7t5AOHcLk3z7lnMqGeTyoA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "306317035421-3gpdsd735d4h9sctdnqtf2jdvvkc5rcq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
