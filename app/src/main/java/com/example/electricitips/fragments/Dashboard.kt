@@ -1,11 +1,13 @@
 package com.example.electricitips.fragments
 
 
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.media.MediaPlayer
 import androidx.fragment.app.Fragment
 import android.os.Bundle
 import android.text.TextUtils
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,9 +15,14 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.electricitips.*
+import com.example.electricitips.R
 import com.example.electricitips.databinding.FragmentDashboardBinding
-
-
+import com.google.firebase.database.*
+import com.google.firebase.database.ktx.database
+import com.google.firebase.database.ktx.getValue
+import com.google.firebase.ktx.Firebase
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 class Dashboard: Fragment(R.layout.fragment_dashboard) {
@@ -25,6 +32,7 @@ class Dashboard: Fragment(R.layout.fragment_dashboard) {
     private var filteredArrayList = ArrayList<Appliance>()
     private lateinit var applianceDBHelper: ApplianceDBHelper
     private lateinit var rateDBHelper: RateDBHelper
+    private lateinit var database: DatabaseReference
 
      override fun onCreateView(
          inflater: LayoutInflater,
@@ -33,14 +41,44 @@ class Dashboard: Fragment(R.layout.fragment_dashboard) {
      ): View? {
          binding = FragmentDashboardBinding.inflate(inflater, container, false)
 
-         var test : Float
-
          // initialize db helpers
          applianceDBHelper = ApplianceDBHelper(requireActivity().applicationContext)
          rateDBHelper = RateDBHelper(requireActivity().applicationContext)
 
+         // connect to firebase database
+         database = Firebase.database("https://electricitips-default-rtdb.asia-southeast1.firebasedatabase.app/").reference
 
-         binding!!.inputCostRate.setText(rateDBHelper.readCost().toString())
+         val rateListener = object : ValueEventListener{
+             override fun onDataChange(snapshot: DataSnapshot) {
+                 val rate = snapshot.value
+                 binding!!.inputCostRate.setText(rate.toString())
+             }
+
+             override fun onCancelled(error: DatabaseError) {
+                 Log.w(TAG, "loadPost:onCancelled", error.toException())
+             }
+
+         }
+
+         val applianceListener = object : ValueEventListener{
+             override fun onDataChange(snapshot: DataSnapshot) {
+                 if(snapshot.exists()){
+                     arrayList.clear()
+                     readAppliances(snapshot.value as Map<String, Objects>)
+                     val cardAdapter = RecyclerViewAdapter(arrayList, requireParentFragment())
+                     binding?.dashboardRecyclerview?.adapter = cardAdapter
+                 }
+
+             }
+
+             override fun onCancelled(error: DatabaseError) {
+                 Log.w(TAG, "loadPost:onCancelled", error.toException())
+             }
+
+         }
+
+         database.child("rate").addListenerForSingleValueEvent(rateListener)
+         database.child("appliances").addListenerForSingleValueEvent(applianceListener)
 
          binding!!.setRateBtn.setOnClickListener {
              val mSet = MediaPlayer.create(context,R.raw.set)
@@ -50,28 +88,54 @@ class Dashboard: Fragment(R.layout.fragment_dashboard) {
                  Toast.makeText(context, "Enter Electricity Rate", Toast.LENGTH_LONG).show()
              }
              else{
-                 val cost = binding!!.inputCostRate.text.toString().toFloat()
-                 rateDBHelper.insertRate(cost)
-                 test = rateDBHelper.readCost()
+                 val cost = binding!!.inputCostRate.text.toString().toDouble()
                  mSet.start()
-
+                 database.child("rate").setValue(cost)
+                     .addOnSuccessListener {
+                     Toast.makeText(context, "Rate successfully set!",Toast.LENGTH_SHORT).show()
+                    }
+                     .addOnFailureListener {
+                         Toast.makeText(context, "Error on setting rate",Toast.LENGTH_SHORT).show()
+                     }
                  // hide keyboard layout after set button is pressed
                  val imm: InputMethodManager = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                  imm.hideSoftInputFromWindow(binding!!.costInputLayout.windowToken,0)
-                 Toast.makeText(context, "Electricity rate set! $test",Toast.LENGTH_SHORT).show()
              }
 
          }
          return binding!!.root
      }
 
+    private fun readAppliances(appliances: Map<String, Objects>) {
+        for((key, _) in appliances.entries){
+
+            val singleItem = appliances[key] as Map<String, Objects>
+
+            try{
+                val item = Appliance(
+                    modelCode = singleItem["code"].toString(),
+                    name = singleItem["name"].toString(),
+                    imgId = singleItem["imgID"].toString().toInt(),
+                    type = singleItem["type"].toString(),
+                    frequency = singleItem["frequency"].toString(),
+                    rating = singleItem["rating"].toString().toDouble(),
+                    duration = singleItem["duration"].toString().toDouble()
+                )
+                arrayList.add(item)
+            }catch (e: Exception){
+                Toast.makeText(context,"$e",Toast.LENGTH_SHORT).show()
+            }
+
+
+        }
+
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        arrayList = applianceDBHelper.readAllAppliances()
-
         if(arrayList.size == 0){
-            arrayList.add(Appliance(R.drawable.empty,"No items to show","","",0.0f,0.0f,""))
+            arrayList.add(Appliance(R.drawable.empty,"No items to show","","",0.0,0.0,""))
         }
         // setup adapter for card view inside the recycler view
         val cardAdapter = RecyclerViewAdapter(arrayList, this)
@@ -274,3 +338,4 @@ class Dashboard: Fragment(R.layout.fragment_dashboard) {
     }
 
 }
+

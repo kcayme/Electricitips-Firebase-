@@ -5,6 +5,7 @@ import android.media.MediaPlayer
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.TextUtils.isEmpty
+import android.util.Log
 import android.view.MenuItem
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
@@ -16,6 +17,12 @@ import androidx.navigation.Navigation
 import androidx.navigation.ui.onNavDestinationSelected
 import com.example.electricitips.databinding.ActivityMainBinding
 import com.example.electricitips.databinding.FragmentInputFormBinding
+import com.google.firebase.database.ChildEventListener
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ktx.database
+import com.google.firebase.ktx.Firebase
 
 /*
         Minimum Requirements:
@@ -34,16 +41,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     // navigation components
     private lateinit var navController: NavController
-    // database helper
-    private lateinit var applianceDBHelper: ApplianceDBHelper
+    private lateinit var database: DatabaseReference
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // setup db helper
-        applianceDBHelper = ApplianceDBHelper(this)
+        // connect to database
+        //if(database == null){
+            try {
+                database = Firebase.database("https://electricitips-default-rtdb.asia-southeast1.firebasedatabase.app/").reference
+            }
+            catch (e: Exception){
+                Log.e("Main",e.toString())
+            }
+        //}
+
+
         // setup navController
         navController = Navigation.findNavController(this,R.id.nav_host_fragment)
 
@@ -133,11 +148,24 @@ class MainActivity : AppCompatActivity() {
                     // blue text is just to ensure variables are passed to correct object parameters
                     val newAppliance = Appliance(imgId = imgID, name = name,
                         modelCode = code, type = type,
-                        rating = rating.toFloat(), duration = duration.toFloat(), frequency = freq
+                        rating = rating.toDouble(), duration = duration.toDouble(), frequency = freq
                     )
-                    applianceDBHelper.insertAppliance(newAppliance)
-                    mSuccess.start()
-                    Toast.makeText(this,"New item added!", Toast.LENGTH_SHORT).show()
+                    try{
+                        val key = database.child("appliances")
+                        val item = newAppliance.toMap()
+                        mSuccess.start()
+                        key.push().setValue(item)
+                            .addOnSuccessListener {
+
+                                Toast.makeText(this,"New item added!", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(this,"Error insert to database", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                    catch (e: Exception){
+                        Log.e("MAIN","$e")
+                    }
                     navController.popBackStack()
                     navController.navigate(R.id.dashboard)
                     binding.bottomNavView.menu.getItem(1).isChecked = true

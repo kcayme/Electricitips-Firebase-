@@ -11,11 +11,18 @@ import androidx.appcompat.app.AlertDialog
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ktx.database
+import com.google.firebase.ktx.Firebase
 
 class RecyclerViewAdapter (private var arrayList: ArrayList<Appliance>, val context: Fragment) : RecyclerView.Adapter<RecyclerViewAdapter.ViewHolder>() {
 
-    private lateinit var applianceDBHelper: ApplianceDBHelper
     private var mDelete = MediaPlayer.create(context.requireContext(), R.raw.delete)
+    private lateinit var database: DatabaseReference
+    private var localArray = arrayList
 
     class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView){
 
@@ -64,18 +71,19 @@ class RecyclerViewAdapter (private var arrayList: ArrayList<Appliance>, val cont
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.cardview_items, parent, false)
-        // initialize db helper
-        applianceDBHelper = ApplianceDBHelper(context.requireContext())
+        // initialize firebase
+
+        database = Firebase.database("https://electricitips-default-rtdb.asia-southeast1.firebasedatabase.app/").reference
 
         return ViewHolder(v)
     }
 
     override fun getItemCount(): Int {
-        return arrayList.size
+        return localArray.size
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bindItems(arrayList[position])
+        holder.bindItems(localArray[position])
 
         val collapseBtn = holder.itemView.findViewById<Button>(R.id.card_collapseBtn)
         collapseBtn.setOnClickListener {
@@ -96,20 +104,36 @@ class RecyclerViewAdapter (private var arrayList: ArrayList<Appliance>, val cont
                     .setMessage("Proceed to delete item?")
                     .setPositiveButton("OK") { _, _ ->
                         mDelete.start()
+                        val deleteQuery = localArray[position].modelCode
                         try {
                             // delete item from database
-                            applianceDBHelper.deleteAppliance(arrayList[position].modelCode)
-                            arrayList.removeAt(position)
+                            val query = database.child("appliances").orderByChild("code").equalTo(deleteQuery)
+                            query.addListenerForSingleValueEvent(object : ValueEventListener{
+                                override fun onDataChange(snapshot: DataSnapshot) {
+                                    if(snapshot.exists()){
+                                        for (item in snapshot.children) {
+                                            item.ref.removeValue()
+                                        }
+                                    }
+                                    Toast.makeText(context.requireContext(),"Item deleted!",Toast.LENGTH_SHORT).show()
+                                }
 
-                            if (arrayList.size == 0) {
-                                arrayList.add(
+                                override fun onCancelled(error: DatabaseError) {
+                                    Toast.makeText(context.requireContext(),"$error",Toast.LENGTH_SHORT).show()
+                                }
+
+                            })
+                            localArray.removeAt(position)
+
+                            if (localArray.size == 0) {
+                                localArray.add(
                                     Appliance(
                                         R.drawable.empty,
                                         "No items to show",
                                         "",
                                         "",
-                                        0.0f,
-                                        0.0f,
+                                        0.0,
+                                        0.0,
                                         ""
                                     )
                                 )
